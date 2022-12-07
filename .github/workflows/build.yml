@@ -4,7 +4,6 @@ env: { VERSION: "2.1.0-simplified", LPM_VERSION: "0.1", ENHANCED_BRANCHES: "orig
 jobs:
   build-macos:
     runs-on: macos-latest
-    env: { PLATFORM: "x86_64-macos" }
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -17,17 +16,21 @@ jobs:
         run: |
           git submodule update --init --depth=1
       - name: Build macOS (Regular Normal/All-in-One)
+        env: { PLATFORM: "x86_64-macos" }
         run: |
           export GIT_REV=`git rev-parse --short HEAD`
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE                     && tar -czvf lite-xl-$VERSION-$PLATFORM-allinone.tar.gz           lite-xl
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-$GIT_REV'"'                                                && tar -czvf lite-xl-$VERSION-$PLATFORM.tar.gz                    lite-xl data
+          ls -la
       - name: Package macOS
+        env: { PLATFORM: "x86_64-macos" }
         uses: actions/upload-artifact@v3
         with:
           name: lite-xl-$VERSION-$PLATFORM
           path: lite-xl-$VERSION-$PLATFORM.tar.gz
           if-no-files-found: error
       - name: Package macOS All-in-one
+        env: { PLATFORM: "x86_64-macos" }
         uses: actions/upload-artifact@v3
         with:
           name: lite-xl-$VERSION-$PLATFORM-allinone
