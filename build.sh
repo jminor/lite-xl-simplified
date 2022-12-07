@@ -7,7 +7,13 @@
 : ${JOBS=12}
 
 CFLAGS=" $CFLAGS $@ -Isrc -fno-strict-aliasing"
-LDFLAGS=" $LDFLAGS -lm -static-libgcc"
+LDFLAGS=" $LDFLAGS -lm"
+
+if [[ $OSTYPE == 'darwin'* ]]; then
+  CC=clang
+else
+  LDFLAGS=" $LDFLAGS -static-libgcc"
+fi
 
 [[ "$@" == "clean" ]] && rm -rf lib/SDL/build liblite.a *.o index* $BIN && exit 0
 
@@ -17,7 +23,11 @@ LDFLAGS=" $LDFLAGS -lm -static-libgcc"
 if [[ "$@" != *"-lSDL"* && "$@" != *"-sUSE_SDL"* ]]; then
   [ ! -e "lib/SDL/include" ] && echo "Make sure you've cloned submodules. (git submodule update --init --depth=1)" && exit -1
   [ ! -e "lib/SDL/build" ] && cd lib/SDL && mkdir -p build && cd build && CFLAGS="$LLFLAGS" CC=$CC ../configure $SDL_CONFIGURE --disable-audio --disable-joystick --disable-haptic --disable-sensor -- && make -j $JOBS && cd ../../..
-  LDFLAGS=" $LDFLAGS -Llib/SDL/build/build/.libs -l:libSDL2.a"
+  if [[ $CC == 'clang' ]]; then
+    LDFLAGS=" $LDFLAGS lib/SDL/build/build/.libs/libSDL2.a"
+  else
+    LDFLAGS=" $LDFLAGS -Llib/SDL/build/build/.libs -l:libSDL2.a"
+  fi
   [[ $OSTYPE == 'msys'* || $CC == *'mingw'* ]] && LDFLAGS=" $LDFLAGS -lmingw32 -l:libSDL2main.a"
   CFLAGS=" $CFLAGS -Ilib/SDL/include"
 fi
@@ -65,8 +75,8 @@ fi
 SRCS="src/*.c src/api/*.c"
 if [[ $OSTYPE == 'darwin'* ]]; then
   CFLAGS="$CFLAGS -DLITE_USE_SDL_RENDERER"
-  LDFLAGS="$LDFLAGS -Framework CoreServices -Framework Foundation"
-  SRCS=$SRCS src/*.m
+  LDFLAGS="$LDFLAGS -liconv -lobjc -Wl,-framework,CoreVideo -Wl,-framework,Cocoa -Wl,-framework,Carbon -Wl,-framework,IOKit -Wl,-weak_framework,QuartzCore -Wl,-weak_framework,Metal"
+  SRCS="$SRCS src/*.m"
 fi
 [[ $OSTYPE != 'msys'* && $CC != *'mingw'* && $CC != "emcc" ]] && LDFLAGS=" $LDFLAGS -ldl -pthread"
 [[ $OSTYPE == 'msys'* || $CC == *'mingw'* ]] && LDFLAGS="resources/icons/icon.res $LDFLAGS -lwinmm -lgdi32 -loleaut32 -lole32 -limm32 -lversion -lsetupapi -luuid -mwindows"
