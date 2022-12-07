@@ -1,8 +1,40 @@
 name: CI
-on: { push: { branches: [master] } }
+on: { push: { branches: [master, mac] } }
 env: { VERSION: "2.1.0-simplified", LPM_VERSION: "0.1", ENHANCED_BRANCHES: "origin/c-tokenizer", BINARY_PLUGINS: "plugin_manager", NORMAL_PLUGINS: "", LITE_USERDIR: "data", LPM_REPOS: "https://github.com/adamharrison/lite-xl-plugin-manager.git" }
 jobs:
-  build:
+  build-macos:
+    runs-on: macos-latest
+    env: { PLATFORM: "x86_64-macos" }
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup Identity & Environment
+        run: |
+          git config --global user.name "Github Actions" && git config --global user.email "adamdharrison@gmail.com"
+      - name: Clone Submodules
+        run: |
+          git submodule update --init --depth=1
+      - name: Build macOS (Regular Normal/All-in-One)
+        run: |
+          export GIT_REV=`git rev-parse --short HEAD`
+          ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE                     && tar -czvf lite-xl-$VERSION-$PLATFORM-allinone.tar.gz           lite-xl
+          ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-$GIT_REV'"'                                                && tar -czvf lite-xl-$VERSION-$PLATFORM.tar.gz                    lite-xl data
+      - name: Package macOS
+        uses: actions/upload-artifact@v3
+        with:
+          name: lite-xl-$VERSION-$PLATFORM
+          path: lite-xl-$VERSION-$PLATFORM.tar.gz
+          if-no-files-found: error
+      - name: Package macOS All-in-one
+        uses: actions/upload-artifact@v3
+        with:
+          name: lite-xl-$VERSION-$PLATFORM-allinone
+          path: lite-xl-$VERSION-$PLATFORM-allinone.tar.gz
+          if-no-files-found: error
+
+  build-windows-linux-emscripten:
     runs-on: ubuntu-latest
     defaults: { run: { shell: bash } }
     steps:
@@ -58,28 +90,28 @@ jobs:
           git merge $ENHANCED_BRANCHES --no-commit && cp /tmp/enhanced-data.c src/data.c && rm -f liblite.a
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE $LUAJIT_CC && zip -r lite-xl-$VERSION-$PLATFORM-enhanced-allinone.zip        lite-xl.exe
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-$GIT_REV'"' $LUAJIT_CC                            && zip -r lite-xl-$VERSION-$PLATFORM-enhanced.zip                 lite-xl.exe data
-      - name: Create Release & Update Manifest
-        env: { GITHUB_TOKEN: "${{ github.token }}" }
-        run: |
-          gh release delete -y continuous || true; gh release create -t 'Continuous Release' -n 'A continuous release of lite-xl. See the README for more details.' continuous  *.zip *.tar.gz *.deb
-          if [[ `git tag --points-at HEAD | head -c 4` == "v"* ]]; then
-            export RELEASE=`git tag --points-at HEAD | head -c 4 | sed 's/^v//'`
-            gh release delete -y v$RELEASE || true; 
-            gh release create -t v$RELEASE v$RELEASE *.zip *.tar.gz *.deb
-            git reset master --hard && git checkout master
-            cat manifest.json | 
-              jq '.["lite-xls"][0].files[0].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-linux.tar.gz          | sed 's/ .*//'`'"' |
-              jq '.["lite-xls"][1].files[0].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-linux-enhanced.tar.gz | sed 's/ .*//'`'"' |
-              jq '.["lite-xls"][0].files[1].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-windows.zip           | sed 's/ .*//'`'"' |
-              jq '.["lite-xls"][1].files[1].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-windows-enhanced.zip  | sed 's/ .*//'`'"' > new-manifest.json
-            mv new-manifest.json manifest.json && git add manifest.json && git commit -m 'Updated manifest.json with updated release checksums.' && git push
-          fi
+      # - name: Create Release & Update Manifest
+      #   env: { GITHUB_TOKEN: "${{ github.token }}" }
+      #   run: |
+      #     gh release delete -y continuous || true; gh release create -t 'Continuous Release' -n 'A continuous release of lite-xl. See the README for more details.' continuous  *.zip *.tar.gz *.deb
+      #     if [[ `git tag --points-at HEAD | head -c 4` == "v"* ]]; then
+      #       export RELEASE=`git tag --points-at HEAD | head -c 4 | sed 's/^v//'`
+      #       gh release delete -y v$RELEASE || true; 
+      #       gh release create -t v$RELEASE v$RELEASE *.zip *.tar.gz *.deb
+      #       git reset master --hard && git checkout master
+      #       cat manifest.json | 
+      #         jq '.["lite-xls"][0].files[0].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-linux.tar.gz          | sed 's/ .*//'`'"' |
+      #         jq '.["lite-xls"][1].files[0].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-linux-enhanced.tar.gz | sed 's/ .*//'`'"' |
+      #         jq '.["lite-xls"][0].files[1].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-windows.zip           | sed 's/ .*//'`'"' |
+      #         jq '.["lite-xls"][1].files[1].checksum = "'`sha256sum lite-xl-$VERSION-x86_64-windows-enhanced.zip  | sed 's/ .*//'`'"' > new-manifest.json
+      #       mv new-manifest.json manifest.json && git add manifest.json && git commit -m 'Updated manifest.json with updated release checksums.' && git push
+      #     fi
       - name: Build Emscripten
         run: |
           export GIT_REV=`git rev-parse --short HEAD`
           git clone https://github.com/emscripten-core/emsdk.git --depth=1 && cd emsdk && ./emsdk install latest && ./emsdk activate latest && source ./emsdk_env.sh && cd .. && rm -rf data/plugins/plugin_manager data/libraries src/data.c
           ./build.sh clean && AR=emar CC=emcc ./build.sh -DLITE_VERSION='"'$VERSION-wasm-$GIT_REV'"' -I`$EMSDK/upstream/emscripten/system/bin/sdl2-config --cflags` `$EMSDK/upstream/emscripten/system/bin/sdl2-config --libs` -o index.html -s ASYNCIFY -s USE_SDL=2 -s ASYNCIFY_WHITELIST="['main','SDL_WaitEvent','SDL_WaitEventTimeout','SDL_Delay','Emscripten_GLES_SwapWindow','SDL_UpdateWindowSurfaceRects','f_call','luaD_callnoyield','luaV_execute','luaD_precall','precallC','luaD_call','f_sleep','Emscripten_UpdateWindowFramebuffer','luaC_freeallobjects','GCTM','luaD_rawrunprotected','lua_close','close_state','f_end_frame','rencache_end_frame','ren_update_rects','renwin_update_rects','lua_pcallk','luaB_xpcall','dynCall_vii','f_wait_event']"  --preload-file data --preload-file src -s INITIAL_MEMORY=33554432 -s DISABLE_EXCEPTION_CATCHING=1 -s ALLOW_MEMORY_GROWTH=1 --shell-file resources/lite-xl.html
-      - name: Publish Github Pages
-        run: |
-          git branch -D gh-pages || true && git checkout --orphan gh-pages && git rm -rf . && touch .nojekyll 
-          git add index* .nojekyll && git commit -m 'Automatic GH Commit' --author "Github Actions <>" && git push origin gh-pages -f
+      # - name: Publish Github Pages
+      #   run: |
+      #     git branch -D gh-pages || true && git checkout --orphan gh-pages && git rm -rf . && touch .nojekyll 
+      #     git add index* .nojekyll && git commit -m 'Automatic GH Commit' --author "Github Actions <>" && git push origin gh-pages -f
