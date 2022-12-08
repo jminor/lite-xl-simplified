@@ -8,13 +8,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
-      - name: Setup Identity & Environment
-        run: |
-          git config --global user.name "Github Actions" && git config --global user.email "adamdharrison@gmail.com"
-      - name: Clone Submodules
-        run: |
-          git submodule update --init --depth=1
+          submodules: true
       - name: Build macOS (Regular Normal/All-in-One)
         env: { PLATFORM: "x86_64-macos" }
         run: |
@@ -26,15 +20,15 @@ jobs:
         env: { PLATFORM: "x86_64-macos" }
         uses: actions/upload-artifact@v3
         with:
-          name: lite-xl-$VERSION-$PLATFORM
-          path: lite-xl-$VERSION-$PLATFORM.tar.gz
+          name: lite-xl-${{ env.VERSION }}-${{ env.PLATFORM }}
+          path: lite-xl-${{ env.VERSION }}-${{ env.PLATFORM }}.tar.gz
           if-no-files-found: error
       - name: Package macOS All-in-one
         env: { PLATFORM: "x86_64-macos" }
         uses: actions/upload-artifact@v3
         with:
-          name: lite-xl-$VERSION-$PLATFORM-allinone
-          path: lite-xl-$VERSION-$PLATFORM-allinone.tar.gz
+          name: lite-xl-${{ env.VERSION }}-${{ env.PLATFORM }}-allinone
+          path: lite-xl-${{ env.VERSION }}-${{ env.PLATFORM }}-allinone.tar.gz
           if-no-files-found: error
 
   build-windows-linux-emscripten:
@@ -45,9 +39,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Setup Identity & Environment
-        run: |
-          git config --global user.name "Github Actions" && git config --global user.email "adamdharrison@gmail.com"
       - name: Clone Submodules
         run: |
           git submodule update --init --depth=1
@@ -60,18 +51,18 @@ jobs:
           sudo apt-get install mingw-w64 libc6-dev-i386 && gcc resources/pack.c -o pack-data 
           [[ "$NORMAL_PLUGINS" != "" ]] && ./lpm install $NORMAL_PLUGINS && ./lpm purge
           ./pack-data data/* data/*/* data/*/*/* > /tmp/normal-data.c
-          git merge $ENHANCED_BRANCHES --no-commit
-          ./pack-data data/* data/*/* data/*/*/* > /tmp/enhanced-data.c
+          # git merge $ENHANCED_BRANCHES --no-commit
+          # ./pack-data data/* data/*/* data/*/*/* > /tmp/enhanced-data.c
       - name: Build Linux (Regular/Enhanced + Normal/All-in-One)
         env: { PLATFORM: "x86_64-linux" }
         run: |
           export GIT_REV=`git rev-parse --short HEAD`
           [[ "$BINARY_PLUGINS" != "" ]] && ./lpm add $LPM_REPOS && ./lpm reinstall $BINARY_PLUGINS --arch=$PLATFORM && ./lpm purge && ./build.sh clean
-          cp /tmp/enhanced-data.c src/data.c && cd lib/LuaJIT && make BUILDMODE=static && cd ../..
+          # cp /tmp/enhanced-data.c src/data.c && cd lib/LuaJIT && make BUILDMODE=static && cd ../..
           # We begin with the enhanced version, because we merged it above, in the previous step.
-          ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE $LUAJIT_CC && tar -czvf lite-xl-$VERSION-$PLATFORM-enhanced-allinone.tar.gz  lite-xl
-          ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-$GIT_REV'"' $LUAJIT_CC                            && tar -czvf lite-xl-$VERSION-$PLATFORM-enhanced.tar.gz           lite-xl data
-          git reset master --hard && rm -f liblite.a && cp /tmp/normal-data.c src/data.c
+          # ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE $LUAJIT_CC && tar -czvf lite-xl-$VERSION-$PLATFORM-enhanced-allinone.tar.gz  lite-xl
+          # ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-$GIT_REV'"' $LUAJIT_CC                            && tar -czvf lite-xl-$VERSION-$PLATFORM-enhanced.tar.gz           lite-xl data
+          # git reset master --hard && rm -f liblite.a && cp /tmp/normal-data.c src/data.c
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE                     && tar -czvf lite-xl-$VERSION-$PLATFORM-allinone.tar.gz           lite-xl
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-$GIT_REV'"'                                                && tar -czvf lite-xl-$VERSION-$PLATFORM.tar.gz                    lite-xl data
       - name: Package Debian/Ubuntu
@@ -90,9 +81,9 @@ jobs:
           # We begin with the normal version, because we last used it in the previous step.
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE                     && zip -r lite-xl-$VERSION-$PLATFORM-allinone.zip                 lite-xl.exe
           ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-$GIT_REV'"'                                                && zip -r lite-xl-$VERSION-$PLATFORM.zip                          lite-xl.exe data
-          git merge $ENHANCED_BRANCHES --no-commit && cp /tmp/enhanced-data.c src/data.c && rm -f liblite.a
-          ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE $LUAJIT_CC && zip -r lite-xl-$VERSION-$PLATFORM-enhanced-allinone.zip        lite-xl.exe
-          ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-$GIT_REV'"' $LUAJIT_CC                            && zip -r lite-xl-$VERSION-$PLATFORM-enhanced.zip                 lite-xl.exe data
+          # git merge $ENHANCED_BRANCHES --no-commit && cp /tmp/enhanced-data.c src/data.c && rm -f liblite.a
+          # ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-allinone-$GIT_REV'"' -DLITE_ALL_IN_ONE $LUAJIT_CC && zip -r lite-xl-$VERSION-$PLATFORM-enhanced-allinone.zip        lite-xl.exe
+          # ./build.sh -DLITE_VERSION='"'$VERSION-$PLATFORM-enhanced-$GIT_REV'"' $LUAJIT_CC                            && zip -r lite-xl-$VERSION-$PLATFORM-enhanced.zip                 lite-xl.exe data
       # - name: Create Release & Update Manifest
       #   env: { GITHUB_TOKEN: "${{ github.token }}" }
       #   run: |
